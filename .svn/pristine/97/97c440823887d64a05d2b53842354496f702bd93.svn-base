@@ -1,0 +1,93 @@
+/*
+ * rotary.c
+ *
+ *  Created on: 14-Nov-2017
+ *      Author: saag
+ */
+#include "ch.h"
+#include "hal.h"
+#include "rotary.h"
+
+#if USING_ICU
+icucnt_t last_width, last_period;
+static uint32_t prevb;
+extern uint32_t encv;
+
+static void icuwidthcb(ICUDriver *icup) {
+
+  uint32_t vala,valb;
+  vala = palReadPad(GPIOA,7);
+  valb = palReadPad(GPIOA,8);
+  if((prevb==0) && (valb==1))
+  {
+    if(vala==1)
+    {
+      encv--;
+    }
+    else
+    {
+      encv++;
+    }
+  }
+  prevb = valb;
+}
+
+/*Period is not usesful*/
+static void icuperiodcb(ICUDriver *icup) {
+
+//  last_period = icuGetPeriodX(icup);
+//  chprintf(&SDU1,"Got hit here4");
+
+}
+
+static ICUConfig icucfg = {
+  ICU_INPUT_ACTIVE_HIGH,
+  5000,                                    /* 10kHz ICU clock frequency.   */
+  icuwidthcb,
+  NULL,
+  NULL,
+  ICU_CHANNEL_1,
+  0
+};
+static void icuwidthcb1(ICUDriver *icup) {
+}
+static ICUConfig icucfg1 = {
+  ICU_INPUT_ACTIVE_LOW,
+  5000,                                    /* 10kHz ICU clock frequency.   */
+  icuwidthcb1,
+  NULL,
+  NULL,
+  ICU_CHANNEL_2,
+  0
+};
+
+void initEncoder(void)
+{
+  palSetPadMode(GPIOA, 8, PAL_MODE_INPUT);
+  palSetPadMode(GPIOA, 7, PAL_MODE_INPUT);
+  icuStart(&ICUD1, &icucfg);
+  icuStartCapture(&ICUD1);
+  icuEnableNotifications(&ICUD1);
+}
+
+#else
+static QEIConfig qeicfg = {
+  QEI_MODE_QUADRATURE,
+  QEI_BOTH_EDGES,
+  QEI_DIRINV_FALSE,
+};
+
+
+void initEncoder(void)
+{
+
+  palSetPadMode(GPIOB, 6, PAL_MODE_INPUT);
+  palSetPadMode(GPIOB, 7, PAL_MODE_INPUT);
+
+// CH1 - PB6    CH2 - PB7
+  qeiInit();
+  qeiStart(&QEID4, &qeicfg);
+  qeiEnable(&QEID4);
+}
+
+#endif

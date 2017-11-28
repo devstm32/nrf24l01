@@ -1,0 +1,16 @@
+/*
+ * rotary.h
+ *
+ *  Created on: 14-Nov-2017
+ *      Author: saag
+ */
+
+#ifndef ROTARY_H_
+#define ROTARY_H_
+
+
+
+void initEncoder(void);
+
+
+#endif /* ROTARY_H_ */

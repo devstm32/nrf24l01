@@ -1,0 +1,203 @@
+
+#include "spi_sw.h"
+#include "ch.h"
+#include "hal.h"
+#include <stdbool.h>
+
+/* 3 CE -  PB8
+ * 4 CSN-  PB9
+ * 8 IRQ-  PB7
+ * */
+#define GPIOA_SPI1NSS           4
+// Private variables
+static bool m_init_done = false;
+
+
+#ifndef SPI_BITBANG
+const SPIConfig ls_spicfg = {
+  NULL,
+  NRF_PORT_CSN,
+  NRF_PIN_CSN,
+  SPI_CR1_BR_2 | SPI_CR1_BR_1
+};
+#endif
+
+// Private functions
+static void spi_sw_delay(void);
+
+void spi_sw_init(void) {
+//	if (!m_init_done) {
+#ifdef SPI_BITBANG
+	    palSetPadMode(NRF_PORT_MISO, NRF_PIN_MISO, PAL_MODE_INPUT);
+		palSetPadMode(NRF_PORT_CSN,  NRF_PIN_CSN,  PAL_MODE_OUTPUT_PUSHPULL);
+		palSetPadMode(NRF_PORT_SCK,  NRF_PIN_SCK,  PAL_MODE_OUTPUT_PUSHPULL);
+        palSetPadMode(NRF_PORT_MOSI, NRF_PIN_MOSI, PAL_MODE_OUTPUT_PUSHPULL);
+        palSetPadMode(NRF_PORT_MOSI, 8, PAL_MODE_OUTPUT_PUSHPULL);
+
+        palSetPad(NRF_PORT_CSN, NRF_PIN_CSN);
+        palSetPad(NRF_PORT_CSN, 8);
+		palClearPad(NRF_PORT_SCK, NRF_PIN_SCK);
+#else
+//		  AFIO->MAPR |= AFIO_MAPR_SPI1_REMAP;
+		  chThdSleepMilliseconds(100);
+
+		  palSetPadMode(NRF_PORT_MISO, NRF_PIN_MISO, PAL_MODE_STM32_ALTERNATE_PUSHPULL);     /* SCK. */
+		  palSetPadMode(NRF_PORT_MOSI,  NRF_PIN_MOSI,  PAL_MODE_STM32_ALTERNATE_PUSHPULL);     /* MISO.*/
+		  palSetPadMode(NRF_PORT_SCK,  NRF_PIN_SCK,  PAL_MODE_STM32_ALTERNATE_PUSHPULL);     /* MOSI.*/
+          palSetPadMode(NRF_PORT_CSN, NRF_PIN_CSN, PAL_MODE_OUTPUT_PUSHPULL);
+
+          palSetPadMode(NRF_PORT_CE, NRF_PIN_CE, PAL_MODE_OUTPUT_PUSHPULL);
+          palSetPadMode(NRF_PORT_IRQ, NRF_PIN_IRQ, PAL_MODE_INPUT);
+
+          palSetPad(NRF_PORT_CSN, NRF_PIN_CSN);
+          palSetPad(NRF_PORT_CE, NRF_PIN_CE);
+          spiStart(&SPID1, &ls_spicfg);
+
+#endif
+		m_init_done = true;
+//	}
+}
+
+void spi_sw_stop(void) {
+	palSetPadMode(NRF_PORT_MISO, NRF_PIN_MISO, PAL_MODE_INPUT);
+	palSetPadMode(NRF_PORT_CSN, NRF_PIN_CSN, PAL_MODE_INPUT);
+	palSetPadMode(NRF_PORT_SCK, NRF_PIN_SCK, PAL_MODE_INPUT);
+	palSetPadMode(NRF_PORT_MOSI, NRF_PIN_MOSI, PAL_MODE_INPUT);
+	m_init_done = false;
+}
+
+//void spi_sw_change_pins(
+//		stm32_gpio_t *port_csn, int pin_csn,
+//		stm32_gpio_t *port_sck, int pin_sck,
+//		stm32_gpio_t *port_mosi, int pin_mosi,
+////		stm32_gpio_t *port_miso, int pin_miso) {
+////
+////	bool init_was_done = m_init_done;
+////
+////	if (init_was_done) {
+////		spi_sw_stop();
+////	}
+////
+////	NRF_PORT_CSN = port_csn;
+////	NRF_PIN_CSN = pin_csn;
+////	NRF_PORT_SCK = port_sck;
+////	NRF_PIN_SCK = pin_sck;
+////	NRF_PORT_MOSI = port_mosi;
+////	NRF_PIN_MOSI = pin_mosi;
+////	NRF_PORT_MISO = port_miso;
+////	NRF_PIN_MISO = pin_miso;
+////
+////	if (init_was_done) {
+////		spi_sw_init();
+////	}
+//}
+int utils_middle_of_3_int(int a, int b, int c) {
+    int middle;
+
+    if ((a <= b) && (a <= c)) {
+        middle = (b <= c) ? b : c;
+    } else if ((b <= a) && (b <= c)) {
+        middle = (a <= c) ? a : c;
+    } else {
+        middle = (a <= b) ? a : b;
+    }
+    return middle;
+}
+
+#if 0
+void spi_sw_transfer(char *in_buf, const char *out_buf, int length) {
+#ifdef SPI_BITBANG
+  int i,bit;
+  	palClearPad(NRF_PORT_SCK, NRF_PIN_SCK);
+	spi_sw_delay();
+
+	for (i = 0;i < length;i++) {
+		unsigned char send = out_buf ? out_buf[i] : 0;
+		unsigned char recieve = 0;
+
+		for (bit=0;bit < 8;bit++) {
+			palWritePad(NRF_PORT_MOSI, NRF_PIN_MOSI, send >> 7);
+			send <<= 1;
+
+			spi_sw_delay();
+
+			int r1, r2, r3;
+			r1 = palReadPad(NRF_PORT_MISO, NRF_PIN_MISO);
+			__NOP();
+			r2 = palReadPad(NRF_PORT_MISO, NRF_PIN_MISO);
+			__NOP();
+			r3 = palReadPad(NRF_PORT_MISO, NRF_PIN_MISO);
+
+			recieve <<= 1;
+			if (utils_middle_of_3_int(r1, r2, r3)) {
+				recieve |= 1;
+			}
+
+			palSetPad(NRF_PORT_SCK, NRF_PIN_SCK);
+			spi_sw_delay();
+			palClearPad(NRF_PORT_SCK, NRF_PIN_SCK);
+		}
+
+		if (in_buf) {
+			in_buf[i] = recieve;
+		}
+	}
+#else
+
+	  spiAcquireBus(&SPID1);              /* Acquire ownership of the bus.    */
+//	  spiStart(&SPID1, &ls_spicfg);       /* Setup transfer parameters.       */
+	  spiSelect(&SPID1);                  /* Slave Select assertion.          */
+    spiExchange(&SPID1, length,
+                out_buf, in_buf);          /* Atomic transfer operations.      */
+    spiUnselect(&SPID1);                /* Slave Select de-assertion.       */
+    spiReleaseBus(&SPID1);              /* Ownership release.               */
+
+#endif
+}
+
+void spi_tx_data(uint8_t *d,uint8_t l)
+{
+  spiAcquireBus(&SPID1);              /* Acquire ownership of the bus.    */
+//  spiStart(&SPID1, &ls_spicfg);       /* Setup transfer parameters.       */
+  spiSelect(&SPID1);                  /* Slave Select assertion.          */
+  spiSend(&SPID1,l,d);
+  spiUnselect(&SPID1);                /* Slave Select de-assertion.       */
+  spiReleaseBus(&SPID1);              /* Ownership release.               */
+}
+
+void spi_rx_data(uint8_t *d,uint8_t l)
+{
+  spiAcquireBus(&SPID1);              /* Acquire ownership of the bus.    */
+//  spiStart(&SPID1, &ls_spicfg);       /* Setup transfer parameters.       */
+  spiSelect(&SPID1);                  /* Slave Select assertion.          */
+  spiReceive(&SPID1,l,d);
+  spiUnselect(&SPID1);                /* Slave Select de-assertion.       */
+  spiReleaseBus(&SPID1);              /* Ownership release.               */
+}
+
+
+void spi_sw_begin(void) {
+#ifdef SPI_BITBANG
+	palClearPad(NRF_PORT_CSN, NRF_PIN_CSN);
+	spi_sw_delay();
+#endif
+}
+
+void spi_sw_end(void) {
+#ifdef SPI_BITBANG
+	spi_sw_delay();
+	palSetPad(NRF_PORT_CSN, NRF_PIN_CSN);
+#endif
+}
+
+static void spi_sw_delay(void) {
+#ifdef SPI_BITBANG
+  volatile int i;
+	for (i = 0;i < 5;i++) {
+		__NOP();
+	}
+#endif
+}
+#endif
+
+

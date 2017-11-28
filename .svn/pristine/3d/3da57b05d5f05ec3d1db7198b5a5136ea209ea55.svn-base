@@ -1,0 +1,26 @@
+/*
+ * hwconf.h
+ *
+ *  Created on: 14-Nov-2017
+ *      Author: saag
+ */
+
+#ifndef HWCONF_H_
+#define HWCONF_H_
+
+// NRF pins
+#define NRF_PORT_CSN            GPIOB
+#define NRF_PIN_CSN             9
+#define NRF_PORT_SCK            GPIOB
+#define NRF_PIN_SCK             3
+#define NRF_PORT_MOSI           GPIOB
+#define NRF_PIN_MOSI            5
+#define NRF_PORT_MISO           GPIOB
+#define NRF_PIN_MISO            4
+
+
+#define NRF_PORT_CE            GPIOB
+#define NRF_PIN_CE             8
+
+
+#endif /* HWCONF_H_ */
